@@ -10,25 +10,30 @@ import { RequireAuth, RequireProfile } from "./components/RequireAuth";
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/auth" element={<Navigate to="/login" replace />} />
-        <Route element={<RequireAuth />}>
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route element={<RequireProfile />}>
-            <Route path="/dashboard" element={<HomePage />} />
-            <Route path="/home" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/episodes/new" element={<NewEpisodePage />} />
-            <Route path="/episodes/:episodeId" element={<EpisodeDetailPage />} />
-          </Route>
-        </Route>
+    /* Vibrant mesh gradient wrapper applied across all pages */
+    <div className="min-h-screen bg-soft-mesh bg-fixed font-sans antialiased text-slate-900 transition-colors duration-500 selection:bg-brand-200 selection:text-brand-900">
+      <Router>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth" element={<Navigate to="/login" replace />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+          <Route element={<RequireAuth />}>
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route element={<RequireProfile />}>
+              <Route path="/dashboard" element={<HomePage />} />
+              <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/episodes/new" element={<NewEpisodePage />} />
+              <Route path="/episodes/:episodeId" element={<EpisodeDetailPage />} />
+            </Route>
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </div>
   );
 }
+
 export default App;
