@@ -1,4 +1,4 @@
-import { Plus, Activity, Calendar, ChevronRight, Bell, HeartPulse, Clock } from "lucide-react";
+import { Plus, Activity, Calendar, ChevronRight, Bell, HeartPulse, Clock, Moon, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -8,11 +8,13 @@ import {
   getEpisodeEntries,
 } from "../services/db";
 import { getUserProfile } from "../services/db";
-import { computeCurrentMedicines } from "../utils/episodeState";
+import { computeCurrentMedicines, computeCurrentSymptoms } from "../utils/episodeState";
+import { useTheme } from "../components/ThemeContext";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,6 +24,7 @@ export default function HomePage() {
   const [latestContinuation, setLatestContinuation] = useState(null);
   const [activeEntries, setActiveEntries] = useState([]);
   const [profileName, setProfileName] = useState("");
+  const [episodeSymptoms, setEpisodeSymptoms] = useState({});
 
   useEffect(() => {
     let alive = true;
@@ -40,6 +43,17 @@ export default function HomePage() {
         setActive(a);
         setCompleted(c);
         setProfileName(p?.name || user.displayName || "");
+
+        const allEps = [...a, ...c];
+        const sympMap = {};
+        await Promise.all(allEps.map(async (ep) => {
+          const entries = await getEpisodeEntries(user.uid, ep.id);
+          const symptoms = computeCurrentSymptoms(entries);
+          sympMap[ep.id] = symptoms.join(", ");
+        }));
+        
+        if (!alive) return;
+        setEpisodeSymptoms(sympMap);
 
         if (a?.[0]) {
           const entries = await getEpisodeEntries(user.uid, a[0].id);
@@ -81,19 +95,23 @@ export default function HomePage() {
     <div className="flex flex-col lg:flex-row min-h-screen relative backdrop-blur-3xl">
       
       {/* Floating Sidebar Navigation (Desktop) */}
-      <aside className="hidden lg:flex flex-col w-64 p-6 shrink-0 relative z-10 border-r border-white/20 glass-panel">
+      <aside className="hidden lg:flex flex-col w-64 p-6 shrink-0 relative z-10 border-r border-white/20 dark:border-slate-800 glass-panel dark:bg-slate-900/50">
          <div className="flex items-center gap-3 mb-12 px-2">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-vibrant-blue flex items-center justify-center shadow-lg shadow-brand-500/30">
                <HeartPulse className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900">MedTrack</span>
+            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">MedTrack</span>
          </div>
          <nav className="flex-1 space-y-3 px-2 text-sm font-semibold">
-           <button className="w-full flex items-center gap-3 px-4 py-3 bg-white text-brand-600 rounded-xl shadow-soft">
+           <button className="w-full flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 rounded-xl shadow-soft">
              <Activity className="w-5 h-5" /> Dashboard
            </button>
-           <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-slate-900 hover:bg-white/50 rounded-xl transition-all">
+           <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/50 dark:hover:bg-slate-800 rounded-xl transition-all">
              <Clock className="w-5 h-5" /> Profile
+           </button>
+           <button onClick={toggleTheme} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white/50 dark:hover:bg-slate-800 rounded-xl transition-all">
+             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
            </button>
          </nav>
       </aside>
@@ -128,13 +146,13 @@ export default function HomePage() {
           {/* Main Hero Card (Status) - Spans 8 cols */}
           <div className="lg:col-span-8 glass-card rounded-[2rem] p-1 flex flex-col justify-between overflow-hidden relative group">
             <div className="absolute inset-0 bg-gradient-to-br from-brand-400 via-brand-500 to-vibrant-blue opacity-90 blur-sm mix-blend-overlay"></div>
-            <div className="relative h-full bg-white/70 backdrop-blur-2xl rounded-[1.8rem] p-8 flex flex-col sm:flex-row items-center gap-8 shadow-inner">
+            <div className="relative h-full bg-white/70 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[1.8rem] p-8 flex flex-col sm:flex-row items-center gap-8 shadow-inner">
               <div className="flex-1 w-full text-center sm:text-left">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-100/50 rounded-full text-brand-700 font-bold text-xs uppercase tracking-wider mb-4 border border-brand-200">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-brand-100/50 dark:bg-brand-900/30 rounded-full text-brand-700 dark:text-brand-300 font-bold text-xs uppercase tracking-wider mb-4 border border-brand-200 dark:border-brand-800">
                   <Activity className="w-3 h-3" /> Current Focus
                 </div>
-                <h2 className="text-3xl font-extrabold text-slate-900 mb-2">Today's Protocol</h2>
-                <p className="text-slate-600 font-medium mb-8">Maintain your streaks and keep your logs up to date.</p>
+                <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Today's Protocol</h2>
+                <p className="text-slate-600 dark:text-slate-300 font-medium mb-8">Maintain your streaks and keep your logs up to date.</p>
                 {active?.[0] ? (
                   <button
                     onClick={() => navigate(`/episodes/${active[0].id}`)}
@@ -145,7 +163,7 @@ export default function HomePage() {
                 ) : (
                   <button
                     onClick={() => navigate("/episodes/new")}
-                    className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 hover:scale-105 transition-all text-white px-8 py-3.5 rounded-full font-bold shadow-lg shadow-slate-900/30 flex items-center justify-center gap-2"
+                    className="w-full sm:w-auto bg-slate-900 dark:bg-brand-600 hover:bg-slate-800 dark:hover:bg-brand-500 hover:scale-105 transition-all text-white px-8 py-3.5 rounded-full font-bold shadow-lg shadow-slate-900/30 flex items-center justify-center gap-2"
                   >
                     Start Tracking Now <Plus className="w-4 h-4" />
                   </button>
@@ -155,28 +173,47 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Medicine Reminders Side Panel - Spans 4 cols */}
-          <div className="lg:col-span-4 glass-card rounded-[2rem] p-8 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200 blur-[80px] -z-10 rounded-full"></div>
+          {/* Quick Analytics - Spans 4 cols */}
+          <div className="lg:col-span-4 glass-card dark:bg-slate-800/80 rounded-[2rem] p-8 relative overflow-hidden flex flex-col justify-center">
+            <h3 className="font-extrabold text-slate-900 dark:text-white mb-4 text-xl">Overview</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/60 dark:bg-slate-700/60 rounded-2xl p-4 text-center border border-white dark:border-slate-600">
+                <div className="text-3xl font-black text-brand-600 dark:text-brand-400">{allEpisodes.length}</div>
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Total Logs</div>
+              </div>
+              <div className="bg-white/60 dark:bg-slate-700/60 rounded-2xl p-4 text-center border border-white dark:border-slate-600">
+                <div className="text-3xl font-black text-vibrant-orange dark:text-amber-400">{active.length}</div>
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Active</div>
+              </div>
+              <div className="col-span-2 bg-white/60 dark:bg-slate-700/60 rounded-2xl p-4 text-center border border-white dark:border-slate-600">
+                <div className="text-3xl font-black text-vibrant-purple dark:text-fuchsia-400">{completed.length}</div>
+                <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Resolved</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Medicine Reminders Side Panel - Spans 12 cols, wide layout */}
+          <div className="lg:col-span-12 glass-card dark:bg-slate-800/80 rounded-[2rem] p-8 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200 blur-[80px] -z-10 rounded-full opacity-50"></div>
             <div className="flex items-center justify-between mb-6">
-              <div className="font-extrabold text-slate-900 flex items-center gap-2 text-xl">
+              <div className="font-extrabold text-slate-900 dark:text-white flex items-center gap-2 text-xl">
                 <Bell className="h-6 w-6 text-vibrant-orange" />
                 Medications
               </div>
             </div>
             {reminderMeds.length > 0 ? (
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {reminderMeds.map((med, i) => (
-                  <div key={i} className="bg-white/60 hover:bg-white rounded-2xl px-5 py-4 flex flex-col justify-center border border-white transition-colors duration-200">
-                    <span className="font-bold text-slate-800 tracking-tight">{med.name}</span>
-                    <span className="text-slate-500 text-xs font-semibold">{med.duration || "Ongoing"}</span>
+                  <div key={i} className="bg-white/60 dark:bg-slate-700/60 hover:bg-white dark:hover:bg-slate-600 rounded-2xl px-5 py-4 flex flex-col justify-center border border-white dark:border-slate-500 transition-colors duration-200 text-center">
+                    <span className="font-bold text-slate-800 dark:text-white tracking-tight">{med.name}</span>
+                    <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold truncate">{med.duration || "Ongoing"}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center mt-8 p-6 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                <p className="text-slate-400 font-semibold mb-1">No upcoming meds</p>
-                <p className="text-slate-400/70 text-xs">You're all clear.</p>
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                <p className="text-slate-400 dark:text-slate-500 font-semibold mb-1">No upcoming meds</p>
+                <p className="text-slate-400/70 dark:text-slate-500 text-xs">You're all clear.</p>
               </div>
             )}
           </div>
@@ -225,8 +262,8 @@ export default function HomePage() {
                     </div>
                   </div>
 
-                  <div className="flex-1 text-sm font-medium text-slate-500 line-clamp-3 mb-6 bg-white/40 p-4 rounded-2xl border border-white">
-                    {episode.notes || "No additional notes provided for this episode."}
+                  <div className="flex-1 text-sm font-medium text-slate-500 line-clamp-3 mb-6 bg-white/40 dark:bg-slate-700/60 p-4 rounded-2xl border border-white dark:border-slate-600">
+                    {episodeSymptoms[episode.id] ? `Symptoms: ${episodeSymptoms[episode.id]}` : "No symptoms recorded for this episode."}
                   </div>
 
                   <div className="flex justify-between items-center mt-auto pt-2">

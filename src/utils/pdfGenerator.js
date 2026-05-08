@@ -116,6 +116,40 @@ export function downloadEpisodePdf({ episode, entries, profile }) {
       y += 8;
     }
 
+    if (entry.prescriptionUrl && entry.prescriptionUrl.startsWith("data:image")) {
+      try {
+        const props = doc.getImageProperties(entry.prescriptionUrl);
+        const ratio = props.width / props.height;
+        let imgWidth = 300;
+        let imgHeight = imgWidth / ratio;
+
+        if (imgHeight > 300) {
+          imgHeight = 300;
+          imgWidth = imgHeight * ratio;
+        }
+
+        if (y + imgHeight + 20 > 740) {
+          doc.addPage();
+          y = 48;
+        } else {
+          y += 10;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Prescription Image:", 40, y);
+        doc.setFont("helvetica", "normal");
+        y += 15;
+
+        const formatMatch = entry.prescriptionUrl.match(/data:image\/([a-zA-Z]*);base64,/i);
+        const format = formatMatch ? formatMatch[1].toUpperCase() : 'JPEG';
+        
+        doc.addImage(entry.prescriptionUrl, format, 40, y, imgWidth, imgHeight);
+        y += imgHeight + 20;
+      } catch (e) {
+        console.error("Failed to add image to PDF", e);
+      }
+    }
+
     doc.setTextColor(200);
     doc.line(40, y, 555, y);
     y += 18;

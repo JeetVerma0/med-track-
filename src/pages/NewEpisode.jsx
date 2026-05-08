@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, FileUp, Pill, Stethoscope } from "lucide-react";
+import { ArrowLeft, FileUp, Pill, Stethoscope, UserCircle } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { Button, Card, Container, Input, SectionTitle, Select } from "../components/Ui";
-import { createEpisode, getActiveEpisodes, MED_SOURCE_OPTIONS, SYMPTOM_OPTIONS } from "../services/db";
+import { createEpisode, getActiveEpisodes, getUserProfile, MED_SOURCE_OPTIONS, SYMPTOM_OPTIONS } from "../services/db";
 import { uploadPrescription } from "../services/storage";
 
 function emptyMedicine() {
@@ -15,10 +15,19 @@ export default function NewEpisodePage() {
   const { user } = useAuth();
 
   const [saving, setSaving] = useState(false);
+  const [profileId, setProfileId] = useState("primary");
+  const [userProfile, setUserProfile] = useState(null);
+  
   const [symptoms, setSymptoms] = useState([]);
   const [medicationSource, setMedicationSource] = useState(MED_SOURCE_OPTIONS[0]);
   const [medicines, setMedicines] = useState([emptyMedicine()]);
   const [prescriptionFile, setPrescriptionFile] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      getUserProfile(user.uid).then(p => setUserProfile(p));
+    }
+  }, [user]);
 
   const canSave = useMemo(() => symptoms.length > 0, [symptoms.length]);
 
@@ -43,12 +52,11 @@ export default function NewEpisodePage() {
 
     setSaving(true);
     try {
-      // Keep the app simple: only one active episode at a time.
-      // If an active episode exists, user should continue it (append updates) instead of starting another.
       const active = await getActiveEpisodes(user.uid);
-      if (active?.[0]) {
-        alert("You already have an active episode. Please continue it, or mark it as cured first.");
-        navigate(`/episodes/${active[0].id}`, { replace: true });
+      const myActive = active.filter(a => (a.profileId || "primary") === profileId);
+      if (myActive.length > 0) {
+        alert("This profile already has an active episode. Please continue it, or mark it as cured first.");
+        navigate(`/episodes/${myActive[0].id}`, { replace: true });
         return;
       }
 
@@ -62,6 +70,7 @@ export default function NewEpisodePage() {
       }
 
       await createEpisode(user.uid, {
+        profileId,
         original: {
           symptoms,
           medicationSource,
@@ -70,8 +79,6 @@ export default function NewEpisodePage() {
         },
       });
 
-      // After creating the first entry, go back to dashboard (as requested).
-      // The episode will show under "Current Health Episode".
       navigate("/dashboard", { replace: true });
     } catch (e) {
       alert(e.message || "Failed to create episode");
@@ -100,6 +107,22 @@ export default function NewEpisodePage() {
           />
 
           <div className="mt-6 grid gap-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <div className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <UserCircle className="w-4 h-4" /> Who is this for?
+                </div>
+                <div className="mt-2">
+                  <Select value={profileId} onChange={(e) => setProfileId(e.target.value)}>
+                    <option value="primary">Me ({userProfile?.name || user?.displayName || "Primary"})</option>
+                    {userProfile?.familyProfiles?.map(f => (
+                      <option key={f.id} value={f.id}>{f.name} (Family)</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            </div>
+
             <div>
               <div className="text-sm font-medium text-gray-700">Symptoms</div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -174,6 +197,7 @@ export default function NewEpisodePage() {
                         value={m.name}
                         onChange={(e) => updateMedicine(idx, "name", e.target.value)}
                         placeholder="Medicine name"
+                        list="medicine-list"
                       />
                     </div>
                     <div className="md:col-span-2 flex gap-3">
@@ -194,6 +218,14 @@ export default function NewEpisodePage() {
                   </div>
                 ))}
               </div>
+              <datalist id="medicine-list">
+                <option value="Paracetamol" />
+                <option value="Ibuprofen" />
+                <option value="Amoxicillin" />
+                <option value="Cetirizine" />
+                <option value="Azithromycin" />
+                <option value="Cough Syrup" />
+              </datalist>
             </div>
           </div>
 

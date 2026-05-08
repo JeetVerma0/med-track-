@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Initialize Firestore
@@ -27,4 +27,13 @@ googleProvider.setCustomParameters({
   prompt: "select_account",
 });
 export const db = getFirestore(app);
+
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code == 'failed-precondition') {
+    console.warn("Offline persistence failed: Multiple tabs open.");
+  } else if (err.code == 'unimplemented') {
+    console.warn("Offline persistence not supported by browser.");
+  }
+});
+
 export const storage = getStorage(app);

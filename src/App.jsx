@@ -6,33 +6,40 @@ import HomePage from "./pages/Home";
 import ProfilePage from "./pages/Profile";
 import NewEpisodePage from "./pages/NewEpisode";
 import EpisodeDetailPage from "./pages/EpisodeDetail";
+import SharedEpisodePage from "./pages/SharedEpisode";
 import { RequireAuth, RequireProfile } from "./components/RequireAuth";
+import { ThemeProvider } from "./components/ThemeContext";
 
 function App() {
   return (
-    /* Vibrant mesh gradient wrapper applied across all pages */
-    <div className="min-h-screen bg-soft-mesh bg-fixed font-sans antialiased text-slate-900 transition-colors duration-500 selection:bg-brand-200 selection:text-brand-900">
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/auth" element={<Navigate to="/login" replace />} />
+    <ThemeProvider>
+      {/* Vibrant mesh gradient wrapper applied across all pages */}
+      <div className="min-h-screen bg-soft-mesh bg-fixed font-sans antialiased text-slate-900 transition-colors duration-500 selection:bg-brand-200 selection:text-brand-900 dark:bg-slate-900 dark:text-slate-100">
+        <Router>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth" element={<Navigate to="/login" replace />} />
+            
+            {/* Public Shared Route */}
+            <Route path="/shared/:uid/:episodeId" element={<SharedEpisodePage />} />
 
-          <Route element={<RequireAuth />}>
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route element={<RequireProfile />}>
-              <Route path="/dashboard" element={<HomePage />} />
-              <Route path="/home" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/episodes/new" element={<NewEpisodePage />} />
-              <Route path="/episodes/:episodeId" element={<EpisodeDetailPage />} />
+            <Route element={<RequireAuth />}>
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route element={<RequireProfile />}>
+                <Route path="/dashboard" element={<HomePage />} />
+                <Route path="/home" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/episodes/new" element={<NewEpisodePage />} />
+                <Route path="/episodes/:episodeId" element={<EpisodeDetailPage />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </div>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </div>
+    </ThemeProvider>
   );
 }
 

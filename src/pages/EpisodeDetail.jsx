@@ -8,7 +8,10 @@ import {
   History,
   PencilLine,
   Stethoscope,
+  LineChart as LineChartIcon,
+  Share2
 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAuth } from "../hooks/useAuth";
 import {
   addContinuation,
@@ -37,6 +40,7 @@ export default function EpisodeDetailPage() {
   const [episode, setEpisode] = useState(null);
   const [entries, setEntries] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const [adding, setAdding] = useState(false);
   const [symptomsNow, setSymptomsNow] = useState([]);
@@ -45,11 +49,22 @@ export default function EpisodeDetailPage() {
   const [medicines, setMedicines] = useState([emptyMedicine()]);
   const [doctorVisit, setDoctorVisit] = useState({ doctorName: "", place: "", notes: "" });
   const [prescriptionFile, setPrescriptionFile] = useState(null);
+  const [vitals, setVitals] = useState({ temp: "", bp: "", oxygen: "" });
 
   const isCompleted = episode?.status === "Completed";
   const original = useMemo(() => entries.find((e) => e.type === "original"), [entries]);
   const continuations = useMemo(() => entries.filter((e) => e.type === "update"), [entries]);
   const currentSymptoms = useMemo(() => computeCurrentSymptoms(entries), [entries]);
+
+  const chartData = useMemo(() => {
+    return continuations
+      .filter(e => e.vitals && (e.vitals.temp || e.vitals.bp || e.vitals.oxygen))
+      .map(e => ({
+        date: formatDateTime(e.createdAt),
+        temp: parseFloat(e.vitals.temp) || null,
+        oxygen: parseFloat(e.vitals.oxygen) || null,
+      }));
+  }, [continuations]);
 
   const load = async () => {
     if (!user || !episodeId) return;
@@ -87,8 +102,14 @@ export default function EpisodeDetailPage() {
     const ok = confirm("Mark this episode as completed (cured)? You won't be able to add more updates.");
     if (!ok) return;
     await markEpisodeCompleted(user.uid, episodeId);
-    // After curing, send user back to Dashboard so it appears in Past Episodes.
     navigate("/dashboard", { replace: true });
+  };
+
+  const onShare = () => {
+    const link = `${window.location.origin}/shared/${user.uid}/${episodeId}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
   const onAddContinuation = async () => {
@@ -118,6 +139,11 @@ export default function EpisodeDetailPage() {
           place: doctorVisit.place.trim(),
           notes: doctorVisit.notes.trim(),
         },
+        vitals: {
+          temp: vitals.temp.trim(),
+          bp: vitals.bp.trim(),
+          oxygen: vitals.oxygen.trim(),
+        },
         prescriptionUrl,
       });
 
@@ -127,7 +153,7 @@ export default function EpisodeDetailPage() {
       setMedicines([emptyMedicine()]);
       setDoctorVisit({ doctorName: "", place: "", notes: "" });
       setPrescriptionFile(null);
-      // After saving an update, return to dashboard for reminders + quick overview.
+      setVitals({ temp: "", bp: "", oxygen: "" });
       navigate("/dashboard", { replace: true });
     } catch (e) {
       alert(e.message || "Failed to add update");
@@ -142,12 +168,12 @@ export default function EpisodeDetailPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#f9fafb]">
+      <main className="min-h-screen bg-[#f9fafb] dark:bg-slate-900">
         <Container>
           <div className="py-10">
             <Card className="p-6">
-              <div className="h-3 w-40 rounded bg-gray-100" />
-              <div className="mt-4 h-20 rounded-xl bg-gray-100" />
+              <div className="h-3 w-40 rounded bg-gray-100 dark:bg-slate-700" />
+              <div className="mt-4 h-20 rounded-xl bg-gray-100 dark:bg-slate-700" />
             </Card>
           </div>
         </Container>
@@ -157,11 +183,11 @@ export default function EpisodeDetailPage() {
 
   if (!episode) {
     return (
-      <main className="min-h-screen bg-[#f9fafb]">
+      <main className="min-h-screen bg-[#f9fafb] dark:bg-slate-900">
         <Container>
           <div className="py-10">
             <Card className="p-6">
-              <div className="text-sm text-gray-700">Episode not found.</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300">Episode not found.</div>
             </Card>
           </div>
         </Container>
@@ -170,18 +196,23 @@ export default function EpisodeDetailPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb]">
+    <main className="min-h-screen bg-[#f9fafb] dark:bg-slate-900">
       <Container>
-        <div className="flex items-center justify-between py-6">
+        <div className="flex flex-col sm:flex-row items-center justify-between py-6 gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800"
           >
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
-          <Button onClick={onDownload}>
-            <Download className="h-4 w-4" /> Download Report (PDF)
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={onShare}>
+              <Share2 className="h-4 w-4" /> {copiedLink ? "Copied Link!" : "Share Link"}
+            </Button>
+            <Button onClick={onDownload}>
+              <Download className="h-4 w-4" /> Download Report (PDF)
+            </Button>
+          </div>
         </div>
 
         <div className="grid gap-6 pb-12">
@@ -212,6 +243,7 @@ export default function EpisodeDetailPage() {
                         href={original.prescriptionUrl}
                         target="_blank"
                         rel="noreferrer"
+                        download={original.prescriptionUrl.startsWith("data:") ? "prescription.jpg" : undefined}
                         className="inline-flex items-center gap-2 text-[#3b82f6] hover:underline"
                       >
                         <FileImage className="h-4 w-4" /> View uploaded image
@@ -224,6 +256,29 @@ export default function EpisodeDetailPage() {
               </div>
             </div>
           </Card>
+
+          {chartData.length > 0 && (
+            <Card className="p-6">
+              <SectionTitle
+                icon={<LineChartIcon className="h-5 w-5" />}
+                title="Vitals Trend"
+                subtitle="Visualized temperature and oxygen levels over time."
+              />
+              <div className="mt-6 h-72 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(val) => val.split(',')[0]} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#6b7280' }} domain={['dataMin - 1', 'dataMax + 1']} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#6b7280' }} domain={['dataMin - 2', 100]} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }} />
+                    <Line yAxisId="left" type="monotone" dataKey="temp" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} name="Temp (°F)" />
+                    <Line yAxisId="right" type="monotone" dataKey="oxygen" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} name="SpO2 (%)" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          )}
 
           <Card className="p-6">
             <SectionTitle
@@ -335,6 +390,33 @@ export default function EpisodeDetailPage() {
 
                 <div>
                   <SectionTitle
+                    icon={<span className="text-sm font-semibold text-gray-700">❤️</span>}
+                    title="Vitals (optional)"
+                  />
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Temperature (°F)</label>
+                      <div className="mt-2">
+                        <Input value={vitals.temp} onChange={(e) => setVitals(v => ({ ...v, temp: e.target.value }))} placeholder="e.g. 101.2" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Blood Pressure</label>
+                      <div className="mt-2">
+                        <Input value={vitals.bp} onChange={(e) => setVitals(v => ({ ...v, bp: e.target.value }))} placeholder="e.g. 120/80" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Oxygen (SpO2 %)</label>
+                      <div className="mt-2">
+                        <Input value={vitals.oxygen} onChange={(e) => setVitals(v => ({ ...v, oxygen: e.target.value }))} placeholder="e.g. 98" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <SectionTitle
                     icon={<span className="text-sm font-semibold text-gray-700">Rx</span>}
                     title="Medicines (optional)"
                     right={
@@ -352,6 +434,7 @@ export default function EpisodeDetailPage() {
                             value={m.name}
                             onChange={(e) => updateMedicine(idx, "name", e.target.value)}
                             placeholder="Medicine name"
+                            list="medicine-list"
                           />
                         </div>
                         <div className="md:col-span-2 flex gap-3">
@@ -371,6 +454,14 @@ export default function EpisodeDetailPage() {
                       </div>
                     ))}
                   </div>
+                  <datalist id="medicine-list">
+                    <option value="Paracetamol" />
+                    <option value="Ibuprofen" />
+                    <option value="Amoxicillin" />
+                    <option value="Cetirizine" />
+                    <option value="Azithromycin" />
+                    <option value="Cough Syrup" />
+                  </datalist>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
@@ -485,6 +576,7 @@ function ContinuationEntry({ entry, index, total }) {
             href={entry.prescriptionUrl}
             target="_blank"
             rel="noreferrer"
+            download={entry.prescriptionUrl.startsWith("data:") ? "prescription.jpg" : undefined}
             className="inline-flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs font-medium text-[#3b82f6] ring-1 ring-gray-200 hover:bg-gray-100"
           >
             <FileImage className="h-4 w-4" />
@@ -502,6 +594,18 @@ function ContinuationEntry({ entry, index, total }) {
           <span className="font-medium text-gray-700">Symptoms resolved:</span>{" "}
           <span className="text-gray-800">{resolved || "—"}</span>
         </div>
+        {entry.vitals && (entry.vitals.temp || entry.vitals.bp || entry.vitals.oxygen) && (
+          <div>
+            <span className="font-medium text-gray-700">Vitals:</span>{" "}
+            <span className="text-gray-800">
+              {[
+                entry.vitals.temp ? `Temp: ${entry.vitals.temp}°F` : "",
+                entry.vitals.bp ? `BP: ${entry.vitals.bp}` : "",
+                entry.vitals.oxygen ? `SpO2: ${entry.vitals.oxygen}%` : ""
+              ].filter(Boolean).join(" | ")}
+            </span>
+          </div>
+        )}
         <div>
           <span className="font-medium text-gray-700">Medicines:</span>{" "}
           <span className="text-gray-800">{medicines || "—"}</span>
@@ -541,6 +645,7 @@ function TimelineEntry({ entry }) {
             href={entry.prescriptionUrl}
             target="_blank"
             rel="noreferrer"
+            download={entry.prescriptionUrl.startsWith("data:") ? "prescription.jpg" : undefined}
             className="inline-flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs font-medium text-[#3b82f6] ring-1 ring-gray-200 hover:bg-gray-100"
           >
             <FileImage className="h-4 w-4" />
@@ -562,6 +667,18 @@ function TimelineEntry({ entry }) {
             <span className="text-gray-800">{entry.symptomsResolved.join(", ")}</span>
           </div>
         ) : null}
+        {entry.vitals && (entry.vitals.temp || entry.vitals.bp || entry.vitals.oxygen) && (
+          <div>
+            <span className="font-medium text-gray-700">Vitals:</span>{" "}
+            <span className="text-gray-800">
+              {[
+                entry.vitals.temp ? `Temp: ${entry.vitals.temp}°F` : "",
+                entry.vitals.bp ? `BP: ${entry.vitals.bp}` : "",
+                entry.vitals.oxygen ? `SpO2: ${entry.vitals.oxygen}%` : ""
+              ].filter(Boolean).join(" | ")}
+            </span>
+          </div>
+        )}
         {medicines ? (
           <div>
             <span className="font-medium text-gray-700">Medicines:</span>{" "}

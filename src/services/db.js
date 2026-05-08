@@ -35,7 +35,13 @@ export async function upsertUserProfile(uid, data) {
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) {
-    await setDoc(ref, { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await setDoc(ref, { 
+      ...data, 
+      allergies: data.allergies || "",
+      familyProfiles: data.familyProfiles || [],
+      createdAt: serverTimestamp(), 
+      updatedAt: serverTimestamp() 
+    });
     return;
   }
   await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
@@ -76,11 +82,12 @@ export function entriesCol(uid, episodeId) {
   return collection(db, "users", uid, "episodes", episodeId, "entries");
 }
 
-export async function createEpisode(uid, { original }) {
+export async function createEpisode(uid, { original, profileId = "primary" }) {
   // Use client timestamp so dashboard queries work immediately.
   const now = Timestamp.now();
   const epRef = await addDoc(episodesCol(uid), {
     status: "Active",
+    profileId,
     createdAt: now,
     completedAt: null,
   });
